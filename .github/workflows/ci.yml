@@ -157,7 +157,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: deploy
     if: needs.deploy.result == 'success'
-    environment: production
     timeout-minutes: 5
     steps:
       - name: Check deployed application health
@@ -165,7 +164,7 @@ jobs:
           RENDER_EXTERNAL_URL: ${{ vars.RENDER_EXTERNAL_URL }}
           DEPLOY_ID: ${{ needs.deploy.outputs.deploy_id }}
         run: |
-          : "${RENDER_EXTERNAL_URL:?Add RENDER_EXTERNAL_URL to the production environment variables}"
+          : "${RENDER_EXTERNAL_URL:?Add RENDER_EXTERNAL_URL as a GitHub Actions variable}"
 
           case "$RENDER_EXTERNAL_URL" in
             https://*) ;;
