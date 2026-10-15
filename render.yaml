@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: nexadesk-flowdesk
+    runtime: docker
+    plan: starter
+    region: oregon
+    dockerfilePath: ./DOCKERFILE.dockerfile
+    dockerContext: .
+    autoDeploy: false
+    healthCheckPath: /health
+    disk:
+      name: nexadesk-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: DATABASE_URL
+        value: sqlite:////data/nexadesk.db
+      - key: WEB_CONCURRENCY
+        value: "1"
+      - key: SECRET_KEY
+        generateValue: true

@@ -1,9 +1,7 @@
-
-name: NexaDesk CI
+name: NexaDesk CI/CD
 
 on:
   push:
-    branches: [main, master]
   pull_request:
   workflow_dispatch:
 
@@ -11,97 +9,138 @@ permissions:
   contents: read
 
 jobs:
-  checkout:
-    name: "1. Checkout Code"
+  checks:
+    name: Setup, Tests, Lint, Security & Dependency Audit
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - name: Check out source
+      - name: Checkout Code
         uses: actions/checkout@v4
-
-  setup:
-    name: "2. Setup Python"
-    runs-on: ubuntu-latest
-    needs: checkout
-    steps:
-      - name: Check out source
-        uses: actions/checkout@v4
-      - name: Set up Python
+      - name: Setup Environment
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: requirements-dev.txt
-
-  install:
-    name: "3. Install Dependencies"
-    runs-on: ubuntu-latest
-    needs: setup
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: Install project and quality tools
+      - name: Install Dependencies
         run: python -m pip install -r requirements-dev.txt
-
-  tests:
-    name: "4. Run Tests"
-    runs-on: ubuntu-latest
-    needs: install
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: python -m pip install -r requirements-dev.txt
-      - name: Run tests
+      - name: Run Tests
         run: python -m pytest -q
-
-  lint:
-    name: "5. Lint Code"
-    runs-on: ubuntu-latest
-    needs: tests
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: python -m pip install -r requirements-dev.txt
-      - name: Lint Python
+      - name: Lint Code
         run: ruff check app.py tests
-
-  security:
-    name: "6. Security Scan"
-    runs-on: ubuntu-latest
-    needs: lint
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: python -m pip install -r requirements-dev.txt
-      - name: Scan source with Bandit
+      - name: Security Scan (Bandit)
         run: bandit -q -r app.py
-
-  audit:
-    name: "7. Dependency Audit"
-    runs-on: ubuntu-latest
-    needs: security
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: python -m pip install -r requirements-dev.txt
-      - name: Audit Python dependencies
+      - name: Dependency Audit
         run: pip-audit -r requirements.txt
 
-  docker-build:
-    name: "8. Docker Build"
+  image:
+    name: Docker Build & Trivy Image Scan
     runs-on: ubuntu-latest
-    needs: audit
+    needs: checks
+    timeout-minutes: 20
     steps:
-      - name: Check out source
+      - name: Checkout Code
         uses: actions/checkout@v4
-      - name: Build production image
-        run: docker build --file DOCKERFILE.dockerfile --tag nexadesk:ci .
+      - name: Docker Build
+        run: docker build --file DOCKERFILE.dockerfile --tag "nexadesk:${GITHUB_SHA}" .
+      - name: Trivy Image Scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: nexadesk:${{ github.sha }}
+          format: table
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+  deploy:
+    name: Deploy Application
+    runs-on: ubuntu-latest
+    needs: image
+    if: >-
+      github.event_name != 'pull_request' &&
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    environment: production
+    timeout-minutes: 35
+    outputs:
+      deploy_id: ${{ steps.trigger.outputs.deploy_id }}
+    steps:
+      - name: Trigger Render Deployment
+        id: trigger
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+        run: |
+          : "${RENDER_API_KEY:?Add RENDER_API_KEY to the production GitHub environment secrets}"
+          : "${RENDER_SERVICE_ID:?Add RENDER_SERVICE_ID to the production GitHub environment secrets}"
+
+          response=$(curl --fail-with-body --silent --show-error \
+            --retry 3 --retry-all-errors --retry-delay 2 \
+            --request POST \
+            --url "https://api.render.com/v1/services/${RENDER_SERVICE_ID}/deploys" \
+            --header "Authorization: Bearer ${RENDER_API_KEY}" \
+            --header "Content-Type: application/json" \
+            --data "$(jq -n --arg commit "${GITHUB_SHA}" '{commitId: $commit}')")
+          deploy_id=$(jq -er '.id // empty' <<< "$response")
+          echo "deploy_id=${deploy_id}" >> "$GITHUB_OUTPUT"
+          echo "Render deployment started for commit ${GITHUB_SHA}."
+      - name: Wait for Render Deployment
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          DEPLOY_ID: ${{ steps.trigger.outputs.deploy_id }}
+        run: |
+          for attempt in {1..90}; do
+            response=$(curl --fail-with-body --silent --show-error \
+              --retry 3 --retry-all-errors --retry-delay 2 \
+              --url "https://api.render.com/v1/deploys/${DEPLOY_ID}" \
+              --header "Authorization: Bearer ${RENDER_API_KEY}")
+            status=$(jq -er '.status // empty' <<< "$response")
+            echo "Render deployment status: ${status}"
+
+            if [[ "$status" == "live" ]]; then
+              exit 0
+            fi
+            if [[ "$status" == "build_failed" || "$status" == "update_failed" ||
+                  "$status" == "pre_deploy_failed" || "$status" == "canceled" ||
+                  "$status" == "deactivated" ]]; then
+              echo "Render deployment ended with status: ${status}" >&2
+              exit 1
+            fi
+            sleep 20
+          done
+
+          echo "Render deployment did not become live within 30 minutes." >&2
+          exit 1
+
+  health-check:
+    name: Post-Deployment Health Check
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: needs.deploy.result == 'success'
+    timeout-minutes: 5
+    steps:
+      - name: Check deployed application health
+        env:
+          RENDER_EXTERNAL_URL: ${{ vars.RENDER_EXTERNAL_URL }}
+          DEPLOY_ID: ${{ needs.deploy.outputs.deploy_id }}
+        run: |
+          : "${RENDER_EXTERNAL_URL:?Add RENDER_EXTERNAL_URL as a GitHub Actions variable}"
+          case "$RENDER_EXTERNAL_URL" in
+            https://*) ;;
+            *) echo "RENDER_EXTERNAL_URL must start with https://." >&2; exit 1 ;;
+          esac
+
+          health_url="${RENDER_EXTERNAL_URL%/}/health"
+          for attempt in {1..12}; do
+            if response=$(curl --fail --silent --show-error \
+              --connect-timeout 3 --max-time 5 "$health_url") &&
+              jq -e '.status == "healthy"' <<< "$response" >/dev/null; then
+              echo "Deployment ${DEPLOY_ID} is live and ${health_url} reports healthy."
+              exit 0
+            fi
+            echo "Health check attempt ${attempt}/12 failed; retrying in 5 seconds."
+            sleep 5
+          done
+
+          echo "The deployed application did not pass its /health check." >&2
+          exit 1

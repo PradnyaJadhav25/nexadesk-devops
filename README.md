@@ -92,7 +92,48 @@ The tests use an isolated in-memory SQLite database. They cover setup/login, pas
 
 ## CI workflow
 
-`.github/workflows/ci.yml` runs on pushes to `main`/`master`, pull requests, and manual dispatch. It installs Python dependencies; runs pytest, Ruff, Bandit, and pip-audit; and builds the Docker image. The CI image build is separate from the test/security job so the container build is checked on every trigger.
+`.github/workflows/ci.yml` runs on pushes to any branch, pull requests, and manual dispatch. Its checks job installs dependencies once and runs Pytest, Ruff, Bandit, and `pip-audit`. The next job builds the production Dockerfile and scans that image with Trivy. Trivy fails the workflow for **HIGH** or **CRITICAL** OS/library vulnerabilities when a fix is available; image scan failures block deployment. Pull requests and non-production branches run these checks but never deploy. Only pushes/manual runs on `main` or `master` can deploy.
+
+## Render deployment
+
+`render.yaml` describes a Render Docker web service using the existing `DOCKERFILE.dockerfile`. Render's health probe and the GitHub post-deployment check both use `/health`. The Blueprint disables Render's push-triggered auto-deploy so that production deployments happen only after the GitHub checks and Trivy scan pass.
+
+### One-time Render setup
+
+1. Create or sign in to a Render account and connect the GitHub repository.
+2. In the Render dashboard, choose **New > Blueprint**, select this repository, and apply `render.yaml`. Choose the `starter` service plan; the attached 1 GB disk mounted at `/data` is needed to persist SQLite data. Render generates `SECRET_KEY` for the service; do not copy it into the repository.
+3. Complete the initial service provisioning in Render. From the service's **Settings**, copy the service ID (`srv-...`) and the public service URL (for example, `https://your-service.onrender.com`). Confirm **Auto-Deploy** is disabled.
+4. Create a Render API key in your account settings.
+5. In GitHub, open **Settings > Environments**, create an environment named `production`, then add these two **environment secrets**:
+
+   | Secret | Value |
+   |---|---|
+   | `RENDER_API_KEY` | The Render API key |
+   | `RENDER_SERVICE_ID` | The Render service ID (`srv-...`) |
+
+   Then open **Settings > Secrets and variables > Actions > Variables** and add `RENDER_EXTERNAL_URL` with the public HTTPS base URL, without `/health`. It is a public endpoint, not a credential. Keep credentials in Render/GitHub secret settings; never put them in `.env.example`, workflow YAML, or commits. The Flask session key is generated and kept in Render.
+
+The `Deploy Application` job calls the Render API for the exact Git commit, waits for Render's deployment status to become `live`, and fails if Render reports a failed/canceled deployment or does not become live within 30 minutes. The following job retries the public `/health` endpoint for up to two minutes; any non-success HTTP response or response other than `{"status":"healthy"}` fails the workflow. To add an approval gate, configure required reviewers for the GitHub `production` environment.
+
+### Verify a deployment
+
+1. Run locally before pushing:
+
+   ```powershell
+   python -m pytest -q
+   ruff check app.py tests
+   bandit -q -r app.py
+   pip-audit -r requirements.txt
+   docker build --file DOCKERFILE.dockerfile --tag nexadesk:local .
+   ```
+
+2. Push a change to `main` (or `master`) or merge a pull request. In GitHub, open **Actions > NexaDesk CI/CD** and confirm checks, the Docker build, Trivy, deployment, and health-check jobs pass in order. If a check fails, deployment is blocked; inspect that job's log before retrying.
+3. Open `https://your-service.onrender.com/health`. A healthy response is HTTP `200` with `{"status":"healthy"}`. The endpoint returns HTTP `503` if the database cannot be reached.
+4. For runtime monitoring, use the Render service dashboard's events, logs, and metrics. Render also probes `/health`; a failed probe is visible in service events and can prevent an unhealthy instance from receiving traffic. The GitHub health-check result verifies each deployment, but does not replace continuous external uptime monitoring.
+
+### SQLite persistence and limitations
+
+The Render Blueprint mounts a persistent disk at `/data` and stores the SQLite file there, so deploys/restarts retain it. Render persistent disks require a paid service plan; confirm current Render pricing before provisioning. A disk-backed SQLite service must remain a single instance and is not suitable for horizontal scaling or high availability. Back up the database regularly. The Compose named volume remains unchanged for local development. If you need multiple instances or stronger managed backups, migrate to a managed PostgreSQL database before scaling.
 
 ## Originality and inherited code / licensing
 

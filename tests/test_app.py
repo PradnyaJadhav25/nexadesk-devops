@@ -314,3 +314,13 @@ def test_health_endpoint_checks_database(client):
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json == {"status": "healthy"}
+
+
+def test_health_endpoint_returns_503_when_database_is_unavailable(client, monkeypatch):
+    def fail_database_check(_statement):
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr(db.session, "execute", fail_database_check)
+    response = client.get("/health")
+    assert response.status_code == 503
+    assert response.json == {"status": "unhealthy"}
