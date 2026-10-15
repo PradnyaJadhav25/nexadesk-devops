@@ -44,7 +44,7 @@ jobs:
       - name: Docker Build
         run: docker build --file DOCKERFILE.dockerfile --tag "nexadesk:${GITHUB_SHA}" .
       - name: Trivy Image Scan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: nexadesk:${{ github.sha }}
           format: table
