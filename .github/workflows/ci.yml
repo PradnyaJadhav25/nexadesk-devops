@@ -157,15 +157,12 @@ jobs:
     runs-on: ubuntu-latest
     needs: deploy
     if: needs.deploy.result == 'success'
-    # FIX 1: same environment as the deploy job, so this job can read
-    # variables saved under Settings > Environments > production.
     environment: production
     timeout-minutes: 10
     steps:
       - name: Check deployed application health
         env:
-          # FIX 2: fall back to the known URL if the variable is empty/missing.
-          RENDER_EXTERNAL_URL: ${{ vars.RENDER_EXTERNAL_URL || 'https://nexadesk-devops.onrender.com' }}
+          RENDER_EXTERNAL_URL: "https://nexadesk-devops.onrender.com"
           DEPLOY_ID: ${{ needs.deploy.outputs.deploy_id }}
         run: |
           : "${RENDER_EXTERNAL_URL:?Add RENDER_EXTERNAL_URL as a GitHub Actions variable}"
@@ -178,8 +175,6 @@ jobs:
           health_url="${RENDER_EXTERNAL_URL%/}/health"
           echo "Checking ${health_url}"
 
-          # FIX 3: Render free instances can take a few minutes to wake up,
-          # so allow 30 attempts x 10s (about 5 minutes) with longer timeouts.
           for attempt in {1..30}; do
             if response=$(curl --fail --silent --show-error \
               --connect-timeout 5 --max-time 15 "$health_url") &&
