@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}{{ ticket.title }}{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('tickets') }}">Tickets</a> <b>/</b> #{{ "%04d"|format(ticket.id) }}{% endblock %}
+{% block content %}
+<div class="page-heading detail-heading">
+  <div><div class="eyebrow">TICKET #{{ "%04d"|format(ticket.id) }} <span class="heading-separator">·</span> CREATED {{ ticket.created_at|datetime|upper }}</div><h1>{{ ticket.title }}</h1><p class="muted-copy">Track progress, share context, and stay in touch with your support team.</p></div>
+  <a class="button button-quiet" href="{{ url_for('tickets') }}">← Back to tickets</a>
+</div>
+<div class="detail-grid">
+  <div class="detail-main">
+    <section class="panel description-panel"><div class="panel-heading"><div><h2>Request details</h2><p>Submitted by {{ ticket.requester.name }}</p></div><span class="category-label"><i class="category-dot category-{{ ticket.category|lower }}"></i>{{ ticket.category }}</span></div><div class="description-copy">{{ ticket.description }}</div></section>
+    {% if current_user.role in ('administrator', 'support agent') %}
+    <section class="panel management-panel"><div><h2>Manage ticket</h2><p>Changes are recorded in the activity history.</p></div><div class="management-forms">
+      <form method="post" action="{{ url_for('update_status', ticket_id=ticket.id) }}" class="inline-form"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><label for="status">Status</label><select id="status" name="status">{% for status in statuses %}<option value="{{ status }}" {% if ticket.status == status %}selected{% endif %}>{{ status }}</option>{% endfor %}</select><button class="button button-secondary" type="submit">Update status</button></form>
+      <form method="post" action="{{ url_for('update_assignee', ticket_id=ticket.id) }}" class="inline-form"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><label for="assignee">Assignee</label><select id="assignee" name="assignee_id"><option value="">Unassigned</option>{% for person in users %}<option value="{{ person.id }}" {% if ticket.assignee_id == person.id %}selected{% endif %}>{{ person.name }}</option>{% endfor %}</select><button class="button button-secondary" type="submit">Save assignee</button></form>
+    </div></section>
+    {% endif %}
+    <section class="panel conversation-panel"><div class="panel-heading"><div><h2>Conversation</h2><p>{{ ticket.comments|length }} comment{{ '' if ticket.comments|length == 1 else 's' }}</p></div></div>
+      {% if ticket.comments %}
+      <div class="comment-list">{% for comment in ticket.comments|sort(attribute='created_at') %}<article class="comment"><div class="avatar">{{ comment.author_name[:1]|upper }}</div><div><div class="comment-meta"><strong>{{ comment.author_name }}</strong><time>{{ comment.created_at|datetime }}</time></div><p>{{ comment.body }}</p></div></article>{% endfor %}</div>
+      {% else %}<p class="conversation-empty">No replies yet. Add a comment to share more information or ask a follow-up.</p>{% endif %}
+      <form method="post" action="{{ url_for('add_comment', ticket_id=ticket.id) }}" class="comment-form"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><label for="body">Add a comment</label><textarea id="body" name="body" rows="3" maxlength="2000" placeholder="Write a reply..." required></textarea><div><small>Comments are visible to everyone with access to this ticket.</small><button class="button button-primary" type="submit">Post comment <span>→</span></button></div></form>
+    </section>
+  </div>
+  <aside class="detail-sidebar">
+    <section class="panel metadata-panel"><div class="panel-heading"><h2>Ticket overview</h2></div><dl class="metadata-list"><div><dt>Status</dt><dd><span class="status-pill status-{{ ticket.status|lower|replace(' ', '-') }}">{{ ticket.status }}</span></dd></div><div><dt>Priority</dt><dd><span class="priority-pill priority-text-{{ ticket.priority|lower }}">{{ ticket.priority }}</span></dd></div><div><dt>Category</dt><dd>{{ ticket.category }}</dd></div><div><dt>Requester</dt><dd>{{ ticket.requester.name }}<small>{{ ticket.requester.email }}</small></dd></div><div><dt>Assignee</dt><dd>{{ ticket.assignee.name if ticket.assignee else 'Unassigned' }}{% if ticket.assignee %}<small>{{ ticket.assignee.email }}</small>{% endif %}</dd></div><div><dt>Created</dt><dd>{{ ticket.created_at|datetime }}</dd></div><div><dt>Last updated</dt><dd>{{ ticket.updated_at|datetime }}</dd></div></dl></section>
+    <section class="panel timeline-panel"><div class="panel-heading"><div><h2>Activity history</h2><p>Ticket updates in order</p></div></div><ol class="timeline">{% for activity in activities %}<li><span class="timeline-dot"></span><div><p><strong>{{ activity.actor_name }}</strong> {{ activity.message }}</p><time>{{ activity.created_at|datetime }}</time></div></li>{% else %}<li class="timeline-empty">No activity recorded yet.</li>{% endfor %}</ol></section>
+  </aside>
+</div>
+{% endblock %}

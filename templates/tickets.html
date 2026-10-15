@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Tickets{% endblock %}
+{% block breadcrumb %}Tickets{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div><div class="eyebrow">SUPPORT QUEUE</div><h1>Tickets</h1><p class="muted-copy">Find a request, review its progress, or start a new one.</p></div>
+  <a class="button button-primary" href="{{ url_for('new_ticket') }}"><span class="button-plus">＋</span> Create ticket</a>
+</div>
+
+<section class="panel tickets-panel">
+  <form method="get" class="filter-bar">
+    <label class="search-field"><span aria-hidden="true">⌕</span><input name="q" value="{{ search }}" placeholder="Search tickets..." aria-label="Search tickets"></label>
+    <select name="status" aria-label="Filter by status"><option value="">All statuses</option>{% for status in statuses %}<option value="{{ status }}" {% if selected_status == status %}selected{% endif %}>{{ status }}</option>{% endfor %}</select>
+    <select name="priority" aria-label="Filter by priority"><option value="">All priorities</option>{% for priority in priorities %}<option value="{{ priority }}" {% if selected_priority == priority %}selected{% endif %}>{{ priority }}</option>{% endfor %}</select>
+    <select name="category" aria-label="Filter by category"><option value="">All categories</option>{% for category in categories %}<option value="{{ category }}" {% if selected_category == category %}selected{% endif %}>{{ category }}</option>{% endfor %}</select>
+    <select name="sort" aria-label="Sort tickets"><option value="newest" {% if selected_sort == 'newest' %}selected{% endif %}>Newest first</option><option value="oldest" {% if selected_sort == 'oldest' %}selected{% endif %}>Oldest first</option><option value="updated" {% if selected_sort == 'updated' %}selected{% endif %}>Recently updated</option><option value="priority" {% if selected_sort == 'priority' %}selected{% endif %}>Priority</option></select>
+    <button class="button button-secondary" type="submit">Apply</button>
+  </form>
+  {% if pagination.items %}
+  <div class="table-wrap"><table class="ticket-table"><thead><tr><th>Ticket</th><th>Category</th><th>Requester</th><th>Assignee</th><th>Priority</th><th>Status</th><th>Updated</th></tr></thead>
+    <tbody>{% for ticket in pagination.items %}
+    <tr>
+      <td><a class="ticket-title" href="{{ url_for('ticket_detail', ticket_id=ticket.id) }}">{{ ticket.title }}<small>#{{ "%04d"|format(ticket.id) }}</small></a></td>
+      <td><span class="category-label"><i class="category-dot category-{{ ticket.category|lower }}"></i>{{ ticket.category }}</span></td>
+      <td>{{ ticket.requester.name }}</td><td>{{ ticket.assignee.name if ticket.assignee else 'Unassigned' }}</td>
+      <td><span class="priority-pill priority-text-{{ ticket.priority|lower }}">{{ ticket.priority }}</span></td>
+      <td><span class="status-pill status-{{ ticket.status|lower|replace(' ', '-') }}">{{ ticket.status }}</span></td>
+      <td class="date-cell">{{ ticket.updated_at|datetime }}</td>
+    </tr>
+    {% endfor %}</tbody>
+  </table></div>
+  {% if pagination.pages > 1 %}
+  <div class="pagination"><span>Showing {{ (pagination.page - 1) * pagination.per_page + 1 }}–{{ (pagination.page - 1) * pagination.per_page + pagination.items|length }} of {{ pagination.total }}</span><div>
+    {% if pagination.has_prev %}<a class="page-link" href="{{ url_for('tickets', page=pagination.prev_num, q=search, status=selected_status, priority=selected_priority, category=selected_category, sort=selected_sort) }}">← Previous</a>{% endif %}
+    <span class="page-current">Page {{ pagination.page }} of {{ pagination.pages }}</span>
+    {% if pagination.has_next %}<a class="page-link" href="{{ url_for('tickets', page=pagination.next_num, q=search, status=selected_status, priority=selected_priority, category=selected_category, sort=selected_sort) }}">Next →</a>{% endif %}
+  </div></div>
+  {% endif %}
+  {% else %}
+  <div class="empty-state"><div class="empty-illustration"><span>▤</span><i>✳</i></div><h2>{% if search or selected_status or selected_priority or selected_category %}No matching tickets{% else %}Your queue is ready{% endif %}</h2><p>{% if search or selected_status or selected_priority or selected_category %}Try changing your search or filters to find what you need.{% else %}When a request needs attention, it will be waiting here. Create a ticket to get started.{% endif %}</p>{% if not (search or selected_status or selected_priority or selected_category) %}<a class="button button-primary" href="{{ url_for('new_ticket') }}">Create your first ticket <span>→</span></a>{% endif %}</div>
+  {% endif %}
+</section>
+{% endblock %}

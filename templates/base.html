@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <title>{% block title %}NexaDesk{% endblock %} · NexaDesk</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/nexadesk.css') }}">
+</head>
+<body>
+  {% if current_user.is_authenticated %}
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="{{ url_for('dashboard') }}">
+        <span class="brand-mark" aria-hidden="true">N</span>
+        <span>Nexa<span>Desk</span><small>IT SERVICE CENTER</small></span>
+      </a>
+      <div class="workspace-label">WORKSPACE</div>
+      <nav class="primary-nav" aria-label="Main navigation">
+        <a href="{{ url_for('dashboard') }}" class="{% if request.endpoint == 'dashboard' %}active{% endif %}">
+          <span class="nav-icon">⌂</span> Overview
+        </a>
+        <a href="{{ url_for('tickets') }}" class="{% if request.endpoint in ('tickets', 'ticket_detail') %}active{% endif %}">
+          <span class="nav-icon">▤</span> Tickets
+        </a>
+        {% if current_user.role == 'administrator' %}
+        <a href="{{ url_for('users') }}" class="{% if request.endpoint == 'users' %}active{% endif %}">
+          <span class="nav-icon">♙</span> People
+        </a>
+        {% endif %}
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="sidebar-help"><span class="help-orb">?</span><div><strong>Need a hand?</strong><small>Check your service desk</small></div></div>
+        <div class="profile">
+          <div class="avatar">{{ current_user.name[:1]|upper }}</div>
+          <div class="profile-copy"><strong>{{ current_user.name }}</strong><small>{{ current_user.role|title }}</small></div>
+          <form action="{{ url_for('logout') }}" method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button class="icon-button logout-button" title="Sign out" aria-label="Sign out">↗</button>
+          </form>
+        </div>
+      </div>
+    </aside>
+    <main class="main-area">
+      <header class="topbar">
+        <button class="mobile-menu" type="button" aria-label="Toggle navigation" aria-expanded="false">☰</button>
+        <div class="breadcrumbs"><span>Workspace</span><b>/</b><strong>{% block breadcrumb %}Overview{% endblock %}</strong></div>
+        <div class="topbar-actions">
+          <span class="system-status"><i></i> All systems operational</span>
+          <span class="topbar-avatar">{{ current_user.name[:1]|upper }}</span>
+        </div>
+      </header>
+      <section class="page-content">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+          <div class="flash-stack" aria-live="polite">
+            {% for category, message in messages %}
+            <div class="flash flash-{{ category }}">{{ message }}</div>
+            {% endfor %}
+          </div>
+          {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+      </section>
+      <footer class="site-footer"><span>NexaDesk · IT service management</span><span>Clear requests. Better support.</span></footer>
+    </main>
+  </div>
+  {% else %}
+  <main class="auth-shell">
+    <a class="brand auth-brand" href="{{ url_for('index') }}">
+      <span class="brand-mark" aria-hidden="true">N</span>
+      <span>Nexa<span>Desk</span><small>IT SERVICE CENTER</small></span>
+    </a>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+      <div class="flash-stack" aria-live="polite">
+        {% for category, message in messages %}
+        <div class="flash flash-{{ category }}">{{ message }}</div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    {% endwith %}
+    {% block auth_content %}{% endblock %}
+    <p class="auth-footnote">A calmer way to keep technology moving.</p>
+  </main>
+  {% endif %}
+  <script src="{{ url_for('static', filename='js/nexadesk.js') }}" defer></script>
+</body>
+</html>

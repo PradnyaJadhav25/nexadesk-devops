@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Overview{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div><div class="eyebrow">SERVICE DESK</div><h1>Good day, {{ current_user.name.split()[0] }}</h1><p class="muted-copy">Here’s what’s happening with your support queue.</p></div>
+  <a class="button button-primary" href="{{ url_for('new_ticket') }}"><span class="button-plus">＋</span> Create ticket</a>
+</div>
+
+<section class="metric-grid" aria-label="Ticket summary">
+  <article class="metric-card metric-total"><div class="metric-top"><span>Total tickets</span><span class="metric-icon">▤</span></div><strong>{{ total }}</strong><small>All requests in your workspace</small></article>
+  <article class="metric-card"><div class="metric-top"><span>Open</span><span class="metric-dot dot-open"></span></div><strong>{{ counts['Open'] }}</strong><small>Waiting to be picked up</small></article>
+  <article class="metric-card"><div class="metric-top"><span>In progress</span><span class="metric-dot dot-progress"></span></div><strong>{{ counts['In Progress'] }}</strong><small>Currently being worked on</small></article>
+  <article class="metric-card"><div class="metric-top"><span>Resolved</span><span class="metric-dot dot-resolved"></span></div><strong>{{ counts['Resolved'] }}</strong><small>Completed support requests</small></article>
+</section>
+
+<div class="dashboard-grid">
+  <section class="panel priority-panel">
+    <div class="panel-heading"><div><h2>Priority overview</h2><p>Tickets by severity</p></div><a class="text-link" href="{{ url_for('tickets') }}">View all <span>→</span></a></div>
+    {% if total %}
+    <div class="priority-chart" role="img" aria-label="Priority distribution: {{ priority_counts['Critical'] }} critical, {{ priority_counts['High'] }} high, {{ priority_counts['Medium'] }} medium, {{ priority_counts['Low'] }} low">
+      {% for priority in priorities %}
+      <div class="priority-row"><span class="priority-label"><i class="priority-marker priority-{{ priority|lower }}"></i>{{ priority }}</span><div class="bar-track"><span class="bar-fill bar-{{ priority|lower }}" style="width: {{ (priority_counts[priority] / total * 100)|round(1) }}%"></span></div><strong>{{ priority_counts[priority] }}</strong></div>
+      {% endfor %}
+    </div>
+    <p class="chart-footnote">Distribution reflects {{ total }} ticket{{ '' if total == 1 else 's' }} visible to you.</p>
+    {% else %}
+    <div class="empty-inline"><span class="empty-symbol">◌</span><strong>No ticket trends yet</strong><p>Priority insights will appear as requests come in.</p><a class="text-link" href="{{ url_for('new_ticket') }}">Create your first ticket →</a></div>
+    {% endif %}
+  </section>
+  <section class="panel activity-panel">
+    <div class="panel-heading"><div><h2>Recent activity</h2><p>The latest updates from your queue</p></div><span class="activity-spark">✳</span></div>
+    {% if recent_activities %}
+    <ol class="activity-list">
+      {% for activity in recent_activities %}
+      <li><span class="activity-marker">{{ activity.actor_name[:1]|upper }}</span><div class="activity-copy"><p><strong>{{ activity.actor_name }}</strong> {{ activity.message }} <a href="{{ url_for('ticket_detail', ticket_id=activity.ticket_id) }}">#{{ "%04d"|format(activity.ticket_id) }}</a></p><time>{{ activity.created_at|datetime }}</time></div></li>
+      {% endfor %}
+    </ol>
+    {% else %}
+    <div class="empty-inline"><span class="empty-symbol">✳</span><strong>Nothing to catch up on</strong><p>Ticket creation, assignment, and comments will show up here.</p></div>
+    {% endif %}
+  </section>
+</div>
+
+<section class="panel latest-panel">
+  <div class="panel-heading"><div><h2>Queue snapshot</h2><p>Current distribution across all ticket statuses</p></div><a class="text-link" href="{{ url_for('tickets') }}">Browse tickets <span>→</span></a></div>
+  <div class="status-summary">
+    {% for status in statuses %}
+    <a href="{{ url_for('tickets', status=status) }}" class="status-summary-item"><span class="status-pill status-{{ status|lower|replace(' ', '-') }}">{{ status }}</span><strong>{{ counts[status] }}</strong></a>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

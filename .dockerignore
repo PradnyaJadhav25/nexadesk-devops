@@ -1,0 +1,15 @@
+.git
+.github
+.pytest_cache
+.ruff_cache
+.venv
+venv
+__pycache__
+*.py[cod]
+.env
+.env.*
+!.env.example
+instance
+database
+tests
+README.md

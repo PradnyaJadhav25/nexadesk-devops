@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Create ticket{% endblock %}
+{% block breadcrumb %}<a href="{{ url_for('tickets') }}">Tickets</a> <b>/</b> New request{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div><div class="eyebrow">NEW REQUEST</div><h1>Create a ticket</h1><p class="muted-copy">Tell us what you need help with. Your support team will take it from here.</p></div>
+  <a class="button button-quiet" href="{{ url_for('tickets') }}">← Back to tickets</a>
+</div>
+<div class="form-layout">
+  <section class="panel ticket-form-panel">
+    <form method="post" class="form-stack">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="form-section-heading"><span>01</span><div><h2>Request details</h2><p>Give your support team a clear picture of the issue.</p></div></div>
+      <label for="title">Ticket title <span class="required">*</span></label>
+      <input id="title" name="title" maxlength="160" value="{{ request.form.get('title', '') }}" placeholder="e.g. Unable to connect to office Wi-Fi" required>
+      <label for="description">Description <span class="required">*</span></label>
+      <textarea id="description" name="description" rows="6" maxlength="5000" placeholder="What happened? Include any error messages or steps you already tried." required>{{ request.form.get('description', '') }}</textarea>
+      <div class="form-two-col">
+        <div><label for="category">Category <span class="required">*</span></label><select id="category" name="category" required><option value="">Select a category</option>{% for category in categories %}<option value="{{ category }}" {% if request.form.get('category') == category %}selected{% endif %}>{{ category }}</option>{% endfor %}</select></div>
+        <div><label for="priority">Priority <span class="required">*</span></label><select id="priority" name="priority" required><option value="">Select priority</option>{% for priority in priorities %}<option value="{{ priority }}" {% if request.form.get('priority', 'Medium') == priority %}selected{% endif %}>{{ priority }}</option>{% endfor %}</select></div>
+      </div>
+      {% if current_user.role != 'requester' %}
+      <div class="form-two-col">
+        <div><label for="requester_id">Requester <span class="required">*</span></label><select id="requester_id" name="requester_id" required><option value="">Select a requester</option>{% for person in requesters %}<option value="{{ person.id }}" {% if request.form.get('requester_id', current_user.id|string) == person.id|string %}selected{% endif %}>{{ person.name }} · {{ person.email }}</option>{% endfor %}</select></div>
+        <div><label for="assignee_id">Assign to <span class="optional">(optional)</span></label><select id="assignee_id" name="assignee_id"><option value="">Unassigned</option>{% for person in users %}<option value="{{ person.id }}" {% if request.form.get('assignee_id') == person.id|string %}selected{% endif %}>{{ person.name }}</option>{% endfor %}</select></div>
+      </div>
+      {% else %}
+      <div class="requester-note"><span class="avatar">{{ current_user.name[:1]|upper }}</span><span>Submitting as <strong>{{ current_user.name }}</strong><small>{{ current_user.email }}</small></span></div>
+      {% endif %}
+      <div class="form-actions"><a class="button button-quiet" href="{{ url_for('tickets') }}">Cancel</a><button class="button button-primary" type="submit">Submit ticket <span>→</span></button></div>
+    </form>
+  </section>
+  <aside class="form-aside"><div class="aside-icon">✳</div><h2>Help us help you</h2><p>A descriptive title and the steps you took help the team resolve your issue sooner.</p><div class="aside-note"><strong>What happens next?</strong><p>Your ticket will be added to the service queue. You can follow updates and reply from its detail page.</p></div></aside>
+</div>
+{% endblock %}

@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}People{% endblock %}
+{% block breadcrumb %}People{% endblock %}
+{% block content %}
+<div class="page-heading"><div><div class="eyebrow">WORKSPACE ACCESS</div><h1>People</h1><p class="muted-copy">Manage who can use the NexaDesk service desk.</p></div></div>
+<div class="people-grid">
+  <section class="panel people-panel"><div class="panel-heading"><div><h2>Team accounts</h2><p>{{ users|length }} account{{ '' if users|length == 1 else 's' }}</p></div></div><div class="table-wrap"><table class="ticket-table people-table"><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th></tr></thead><tbody>{% for person in users %}<tr><td><span class="person-name"><span class="avatar">{{ person.name[:1]|upper }}</span>{{ person.name }}</span></td><td>{{ person.email }}</td><td><span class="role-pill role-{{ person.role|replace(' ', '-') }}">{{ person.role|title }}</span></td><td class="date-cell">{{ person.created_at|datetime }}</td></tr>{% endfor %}</tbody></table></div></section>
+  <section class="panel add-person-panel"><div class="panel-heading"><div><h2>Add an account</h2><p>Invite a colleague to the desk.</p></div></div><form method="post" class="form-stack"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><label for="name">Full name</label><input id="name" name="name" maxlength="80" required><label for="email">Work email</label><input id="email" name="email" type="email" maxlength="254" required><label for="password">Temporary password</label><input id="password" name="password" type="password" minlength="10" required><small class="field-hint">At least 10 characters. Share it securely.</small><label for="role">Role</label><select id="role" name="role" required>{% for role in roles %}<option value="{{ role }}">{{ role|title }}</option>{% endfor %}</select><button class="button button-primary button-wide" type="submit">Create account <span>→</span></button></form></section>
+</div>
+{% endblock %}

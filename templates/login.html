@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Sign in{% endblock %}
+{% block auth_content %}
+<section class="auth-card">
+  <div class="eyebrow">YOUR IT SERVICE DESK</div>
+  <h1>Welcome back</h1>
+  <p class="muted-copy">Sign in to track requests and get help from your support team.</p>
+  <form method="post" class="form-stack">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label for="email">Work email</label>
+    <input id="email" name="email" type="email" autocomplete="username" required autofocus>
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" autocomplete="current-password" required>
+    <button class="button button-primary button-wide" type="submit">Sign in <span>→</span></button>
+  </form>
+</section>
+{% endblock %}
