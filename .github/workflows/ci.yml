@@ -162,10 +162,9 @@ jobs:
     steps:
       - name: Check deployed application health
         env:
-          RENDER_EXTERNAL_URL: "https://nexadesk-devops.onrender.com"
           DEPLOY_ID: ${{ needs.deploy.outputs.deploy_id }}
         run: |
-          : "${RENDER_EXTERNAL_URL:?Add RENDER_EXTERNAL_URL as a GitHub Actions variable}"
+          RENDER_EXTERNAL_URL="https://nexadesk-devops.onrender.com"
 
           case "$RENDER_EXTERNAL_URL" in
             https://*) ;;
